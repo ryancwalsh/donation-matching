@@ -79,14 +79,14 @@ function onTransferComplete(): void {
   //TODO: Figure out what this function should do, like https://github.com/Learn-NEAR/NCD.L1.sample--thanks/blob/bfe073b572cce35f0a9748a7d4851c2cfa5f09b9/src/thanks/assembly/index.ts#L76
 }
 
-function simpleTransfer(recipient: AccountId, amount: u128): ContractPromiseBatch {
-  const toRecipient = ContractPromiseBatch.create(recipient);
+function simpleTransfer(destinationAccount: AccountId, amount: u128): ContractPromiseBatch {
+  const toRecipient = ContractPromiseBatch.create(destinationAccount);
   return toRecipient.transfer(amount);
 }
 
 function transferFromEscrow(destinationAccount: AccountId, amount: u128): ContractPromiseBatch {
   const toDestinationAccount = ContractPromiseBatch.create(destinationAccount);
-  return toDestinationAccount.transfer(amount); // TODO: CRITICAL! How can it come FROM the escrow account instead? https://github.com/near-examples/cross-contract-calls
+  return toDestinationAccount.transfer(amount); // TODO: CRITICAL! How can it come FROM the escrow account instead? https://github.com/near-examples/cross-contract-calls/blob/a589ab817835f837201f4afa48be5961d8ce5360/contracts/00.orientation/README.md
 }
 
 function sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: u128, matchersForThisRecipient: MatcherAccountIdCommitmentAmountMap): string {
@@ -115,7 +115,7 @@ export function donate(recipient: AccountId, amount: u128): string {
   const matcherKeysForThisRecipient = matchersForThisRecipient.keys();
   for (let i = 0; i < matcherKeysForThisRecipient.length; i += 1) {
     const matcher = matcherKeysForThisRecipient[i];
-    const message = sendMatchingDonation(matcher, recipient, amount, matchersForThisRecipient);
+    const message = sendMatchingDonation(matcher, recipient, amount, matchersForThisRecipient); // TODO: Probably this call will need to be changed to be async, which means the `message` will need to be retrieved differently.
     messages.push(message);
   }
   const result = messages.join(' ');
