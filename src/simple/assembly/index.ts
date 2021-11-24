@@ -5,17 +5,21 @@ import { AccountId, assert_self, assert_single_promise_success, XCC_GAS } from '
 
 type MatcherAccountIdCommitmentAmountMap = PersistentUnorderedMap<AccountId, u128>; // Maybe https://docs.near.org/docs/concepts/data-storage#persistentset would be more efficient and safer and protect against DDOS attacks that Sherif mentioned.
 
+/**
+ * Storage. 
+ * Example: 
+    {
+      recipient1: {
+        matcher1: 324,
+        matcher2: 950,
+      },
+      recipient2: {
+        matcher2: 12,
+        matcher3: 55,
+      },
+    }
+ */
 const commitments = new PersistentUnorderedMap<AccountId, MatcherAccountIdCommitmentAmountMap>('allCommitments'); // See comment above about PersistentSet​.
-/*{
-  recipient1: {
-    matcher1: 324,
-    matcher2: 950,
-  },
-  recipient2: {
-    matcher2: 12,
-    matcher3: 55,
-  },
-}*/
 
 export function offerMatchingFunds(recipient: AccountId, amount: u128): string {
   const escrow = Context.contractName;

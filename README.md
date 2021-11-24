@@ -16,5 +16,6 @@ On each donation:
 ## Usage
 
 1. clone this repo to a local folder
-2. run `yarn`
-3. (Other steps are still to be determined)
+1. run `yarn`
+1. You will need at least 3 NEAR accounts (which you can create at https://wallet.testnet.near.org/). One to act as a recipient (such as a charity), one to act as a regular donor, and one to act as a "matcher" (someone who commits to match others' donations to a certain recipient).
+1. [TODO: Other steps are still to be determined.]
