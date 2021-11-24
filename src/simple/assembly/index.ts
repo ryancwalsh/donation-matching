@@ -1,13 +1,7 @@
-import { PersistentUnorderedMap, Context, u128, logging, ContractPromise, ContractPromiseBatch } from 'near-sdk-as';
+import { PersistentUnorderedMap, Context, u128, logging, ContractPromiseBatch } from 'near-sdk-as';
+import { AccountId, assert_self, assert_single_promise_success, XCC_GAS } from '../../utils';
 
 // TODO: Write tests for everything in this file.
-
-const XCC_GAS = 20000000000000; // https://github.com/Learn-NEAR/NCD.L1.sample--meme-museum/blob/8c5d025d363f89fdcc7335d58d61a8e3307cd95a/src/utils.ts#L15
-
-/**
- * Account IDs in NEAR are just strings. https://github.com/Learn-NEAR/NCD.L1.sample--meme-museum/blob/8c5d025d363f89fdcc7335d58d61a8e3307cd95a/src/utils.ts#L34
- */
-type AccountId = string;
 
 type MatcherAccountIdCommitmentAmountMap = PersistentUnorderedMap<AccountId, u128>; // Maybe https://docs.near.org/docs/concepts/data-storage#persistentset would be more efficient and safer and protect against DDOS attacks that Sherif mentioned.
 
@@ -71,20 +65,6 @@ export function rescindMatchingFunds(recipient: AccountId, amount: u128): string
   }
   logging.log(result);
   return result;
-}
-
-function assert_single_promise_success(): void {
-  // https://github.com/Learn-NEAR/NCD.L1.sample--thanks/blob/bfe073b572cce35f0a9748a7d4851c2cfa5f09b9/src/utils.ts#L88
-  const results = ContractPromise.getResults();
-  assert(results.length === 1, 'Expected exactly one promise result');
-  assert(results[0].succeeded, 'Expected PromiseStatus to be successful');
-}
-
-function assert_self(): void {
-  // https://github.com/Learn-NEAR/NCD.L1.sample--thanks/blob/bfe073b572cce35f0a9748a7d4851c2cfa5f09b9/src/utils.ts#L82
-  const caller = Context.sender;
-  const self = Context.contractName;
-  assert(caller === self, 'Only this contract may call itself');
 }
 
 function onTransferComplete(): void {
