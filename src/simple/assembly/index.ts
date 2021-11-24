@@ -14,22 +14,24 @@ const commitments: any = {
 };
 
 export function offerMatchingFunds(recipient: AccountId, amount: u128): string {
-  const total = Context.predecessor in commitments[recipient] ? u128.add(commitments[recipient][Context.predecessor], amount) : amount;
-  commitments[recipient][Context.predecessor] = total;
-  const result = `${Context.predecessor} is now committed to match donations to ${recipient} up to a maximum of ${total}`;
+  const { predecessor } = Context;
+  const total = predecessor in commitments[recipient] ? u128.add(commitments[recipient][predecessor], amount) : amount;
+  commitments[recipient][predecessor] = total;
+  const result = `${predecessor} is now committed to match donations to ${recipient} up to a maximum of ${total}`;
   logging.log(result);
   return result;
 }
 
 export function rescindMatchingFunds(recipient: AccountId, amount: u128): string {
-  const total = commitments[recipient][Context.predecessor];
+  const { predecessor } = Context;
+  const total = commitments[recipient][predecessor];
   let result;
   if (amount >= total) {
-    delete commitments[recipient][Context.predecessor];
-    result = `${Context.predecessor} is not matching donations to ${recipient} anymore`;
+    delete commitments[recipient][predecessor];
+    result = `${predecessor} is not matching donations to ${recipient} anymore`;
   } else {
-    commitments[recipient][Context.predecessor] = u128.sub(commitments[recipient][Context.predecessor], amount);
-    result = `${Context.predecessor} rescinded ${amount} and so is now only committed to match donations to ${recipient} up to a maximum of ${total}`;
+    commitments[recipient][predecessor] = u128.sub(commitments[recipient][predecessor], amount);
+    result = `${predecessor} rescinded ${amount} and so is now only committed to match donations to ${recipient} up to a maximum of ${total}`;
   }
   logging.log(result);
   return result;
@@ -55,8 +57,9 @@ function transfer(sender: AccountId, recipient: AccountId, amount: u128): string
 }
 
 export function donate(recipient: AccountId, amount: u128): string {
+  const { predecessor } = Context;
   const messages: string[] = [];
-  const mainDonationMessage = transfer(Context.predecessor, recipient, amount);
+  const mainDonationMessage = transfer(predecessor, recipient, amount);
   messages.push(mainDonationMessage);
 
   Object.keys(commitments[recipient]).forEach((matcher: string) => {
