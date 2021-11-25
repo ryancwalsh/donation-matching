@@ -21,11 +21,11 @@ type MatcherAccountIdCommitmentAmountMap = PersistentUnorderedMap<AccountId, u12
  */
 const commitments = new PersistentUnorderedMap<AccountId, MatcherAccountIdCommitmentAmountMap>('allCommitments'); // See comment above about PersistentSet​.
 
-export function offerMatchingFunds(recipient: AccountId, amount: u128): string {
+export function offerMatchingFunds(recipient: AccountId): string {
   const escrow = Context.contractName;
   const matcher = Context.sender;
-  // Transfer amount to escrow.
-  simpleTransfer(escrow, amount); // Funds go from matcher to contractName (a.k.a. "self" or "escrow").
+  const amount = Context.attachedDeposit;
+  simpleTransfer(escrow, amount); // Funds go from matcher to contractName (a.k.a. "self" or "escrow"). // TODO: Is this unnecessary? If funds are sent here via attachedDeposit, are there any other required steps for them to be considered secured in this contract as escrow?
   // TODO: Probably the rest of this function should be moved to a callback.
   let total = amount;
   if (commitments.contains(recipient)) {
@@ -86,7 +86,7 @@ function simpleTransfer(destinationAccount: AccountId, amount: u128): ContractPr
 
 function transferFromEscrow(destinationAccount: AccountId, amount: u128): ContractPromiseBatch {
   const toDestinationAccount = ContractPromiseBatch.create(destinationAccount);
-  return toDestinationAccount.transfer(amount); // TODO: CRITICAL! How can it come FROM the escrow account instead? https://github.com/near-examples/cross-contract-calls/blob/a589ab817835f837201f4afa48be5961d8ce5360/contracts/00.orientation/README.md
+  return toDestinationAccount.transfer(amount); // TODO: CRITICAL! How can it come FROM the escrow account instead? https://github.com/near-examples/cross-contract-calls/blob/a589ab817835f837201f4afa48be5961d8ce5360/contracts/00.orientation/README.md or maybe instead of the amount having been sent to escrow via `transfer`, I could follow this approach: https://github.com/Learn-NEAR/NCD.L1.sample--lottery/blob/2bd11bc1092004409e32b75736f78adee821f35b/src/lottery/assembly/index.ts#L149
 }
 
 function sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: u128, matchersForThisRecipient: MatcherAccountIdCommitmentAmountMap): string {
@@ -103,7 +103,8 @@ function sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: 
   return result;
 }
 
-export function donate(recipient: AccountId, amount: u128): string {
+export function donate(recipient: AccountId): string {
+  const amount = Context.attachedDeposit;
   assert(amount > u128.Zero, '`amount` must be > 0');
   const sender = Context.sender;
   const matchersForThisRecipient = commitments.getSome(recipient);
