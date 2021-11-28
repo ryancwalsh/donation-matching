@@ -52,13 +52,15 @@ function min(a: u128, b: u128): u128 {
   return u128.lt(a, b) ? a : b;
 }
 
-export function rescindMatchingFunds(recipient: AccountId, requestedAmount: u128): string {
+export function rescindMatchingFunds(recipient: AccountId, requestedAmount: string): string {
+  // Is `string` the correct type for `requestedAmount`?
   const matcher = Context.sender;
+  const requestedWithdrawalAmount = u128.fromString(requestedAmount);
   const matchersForThisRecipient = commitments.getSome(recipient); // Fails if recipient does not exist.
   const amountAlreadyCommitted = matchersForThisRecipient.getSome(matcher); // Fails if matcher does not exist for this recipient.
-  let amountToRescind = requestedAmount;
+  let amountToRescind = requestedWithdrawalAmount;
   let result: string;
-  if (requestedAmount >= amountAlreadyCommitted) {
+  if (requestedWithdrawalAmount >= amountAlreadyCommitted) {
     amountToRescind = amountAlreadyCommitted;
     matchersForThisRecipient.delete(matcher);
     result = `${matcher} is not matching donations to ${recipient} anymore`;
@@ -66,7 +68,7 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: u128
     matchersForThisRecipient.set(matcher, u128.sub(amountAlreadyCommitted, amountToRescind));
     result = `${matcher} rescinded ${amountToRescind} and so is now only committed to match donations to ${recipient} up to a maximum of ${amountAlreadyCommitted}`;
   }
-  transferFromEscrow(matcher, requestedAmount); // Funds go from escrow back to the matcher. // TODO: How could this contract have required pre-payment (during the original pledging of funds) of the fees that would be required for any refund transfer?
+  transferFromEscrow(matcher, requestedWithdrawalAmount); // Funds go from escrow back to the matcher. // TODO: How could this contract have required pre-payment (during the original pledging of funds) of the fees that would be required for any refund transfer?
   // TODO: Should there be a callback?
   logging.log(result);
   return result;
