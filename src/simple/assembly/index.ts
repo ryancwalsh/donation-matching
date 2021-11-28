@@ -88,16 +88,14 @@ function transferFromEscrow(destinationAccount: AccountId, amount: u128): Contra
 }
 
 function sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: u128, matchersForThisRecipient: MatcherAccountIdCommitmentAmountMap): string {
-  const escrow = Context.contractName;
   const remainingCommitment: u128 = matchersForThisRecipient.getSome(matcher);
   const matchedAmount: u128 = min(amount, remainingCommitment);
-  const transferPromise = transferFromEscrow(recipient, matchedAmount);
-
+  logging.log(`${matcher} will send a matching donation of ${matchedAmount} to ${recipient}`);
+  // const transferPromise = transferFromEscrow(recipient, matchedAmount);
+  transferFromEscrow(recipient, matchedAmount);
   // https://github.com/Learn-NEAR/NCD.L1.sample--thanks/blob/bfe073b572cce35f0a9748a7d4851c2cfa5f09b9/src/thanks/assembly/index.ts#L56
-
-  transferPromise.then(escrow).function_call('onTransferComplete', '{}', u128.Zero, XCC_GAS); // TODO: Learn what this means and whether it is correct.
+  // transferPromise.then(escrow).function_call('onTransferComplete', '{}', u128.Zero, XCC_GAS); // TODO: Learn what this means and whether it is correct.
   const result = `${matcher} sent a matching donation of ${matchedAmount} to ${recipient}`;
-  logging.log(result);
   return result;
 }
 

@@ -24,6 +24,6 @@ On each donation:
 1. Similarly call `export` commands to define RECIPIENT, MATCHER, and DONOR with the accountIds from the previous step.
 1. Read https://docs.near.org/docs/tools/near-cli#near-call and decide whether you want to use `--depositYocto` or `--deposit` in the next step.
 1. `near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER --deposit 20 --gas=15280193810960`
-1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": 7}" --accountId $MATCHER --gas=15280193810960`
-1. `near call $CONTRACT donate "{\"recipient\": \"$RECIPIENT\"}" --accountId $DONOR --deposit 10 --gas 2528019381096`
+1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": \"7\"}" --accountId $MATCHER --gas=15280193810960`
+1. `near call $CONTRACT donate "{\"recipient\": \"$RECIPIENT\"}" --accountId $DONOR --deposit 9 --gas 15280193810960`
 1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": 9999}" --accountId $MATCHER --gas=15280193810960`
