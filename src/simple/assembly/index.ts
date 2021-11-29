@@ -1,5 +1,5 @@
 import { PersistentUnorderedMap, Context, u128, logging, ContractPromiseBatch } from 'near-sdk-as';
-import { AccountId, assert_self, assert_single_promise_success, XCC_GAS } from '../../utils';
+import { AccountId, assert_self, assert_single_promise_success, min, XCC_GAS } from '../../utils';
 
 // TODO: Write tests for everything in this file. And build a frontend, too!
 
@@ -65,11 +65,6 @@ export function getCommitments(recipient: AccountId): string {
     }
   }
   return matchersLog.join(' ');
-}
-
-function min(a: u128, b: u128): u128 {
-  // Is there a built-in library function to use here instead?
-  return u128.lt(a, b) ? a : b;
 }
 
 export function rescindMatchingFunds(recipient: AccountId, requestedAmount: string): string {
