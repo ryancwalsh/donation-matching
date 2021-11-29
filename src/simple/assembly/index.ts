@@ -21,7 +21,7 @@ type MatcherAccountIdCommitmentAmountMap = PersistentUnorderedMap<AccountId, u12
       },
     }
  */
-function getAllCommitments() {
+function getAllCommitments(): PersistentUnorderedMap<AccountId, MatcherAccountIdCommitmentAmountMap> {
   return new PersistentUnorderedMap<AccountId, MatcherAccountIdCommitmentAmountMap>('allCommitments'); // See comment above about PersistentSet​.
 }
 
@@ -51,15 +51,15 @@ export function offerMatchingFunds(recipient: AccountId): string {
 }
 
 export function getCommitments(recipient: AccountId): string {
-  const matchersLog = [];
+  const matchersLog: string[] = [];
   const commitments = getAllCommitments();
   if (commitments.contains(recipient)) {
     const matchersForThisRecipient = commitments.getSome(recipient);
     const matchers = matchersForThisRecipient.keys();
     for (let i = 0; i < matchers.length; i += 1) {
       const matcher = matchers[i];
-      const existingCommitment = matchersForThisRecipient.getSome(matcher);
-      const msg = `${matcher} is committed to match donations to ${recipient} up to a maximum of ${existingCommitment}.`;
+      const existingCommitment: u128 = matchersForThisRecipient.getSome(matcher);
+      const msg = `${matcher} is committed to match donations to ${recipient} up to a maximum of ${existingCommitment.toString()}.`;
       logging.log(msg);
       matchersLog.push(msg);
     }
