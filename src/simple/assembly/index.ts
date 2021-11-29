@@ -7,44 +7,23 @@ import { AccountId, assert_self, assert_single_promise_success, min, XCC_GAS } f
 
 type MatcherAccountIdCommitmentAmountMap = PersistentUnorderedMap<AccountId, u128>; // Maybe https://docs.near.org/docs/concepts/data-storage#persistentset would be more efficient and safer and protect against DDOS attacks that Sherif mentioned.
 
-/**
- * Storage. 
- * Example: 
-    {
-      recipient1: {
-        matcher1: 324,
-        matcher2: 950,
-      },
-      recipient2: {
-        matcher2: 12,
-        matcher3: 55,
-      },
-    }
- */
-function getAllCommitments(): PersistentUnorderedMap<AccountId, MatcherAccountIdCommitmentAmountMap> {
-  return new PersistentUnorderedMap<AccountId, MatcherAccountIdCommitmentAmountMap>('allCommitments'); // See comment above about PersistentSet​.
+function getMatcherCommitmentsToRecipient(recipient: AccountId): MatcherAccountIdCommitmentAmountMap {
+  return new PersistentUnorderedMap<AccountId, u128>(`commitments_to_${recipient}`); // Maybe https://docs.near.org/docs/concepts/data-storage#persistentset would be more efficient and safer and protect against DDOS attacks that Sherif mentioned.
 }
 
 export function offerMatchingFunds(recipient: AccountId): string {
   const matcher = Context.sender;
   const amount = Context.attachedDeposit;
   assert(u128.gt(amount, u128.Zero), '`attachedDeposit` must be > 0.');
-  const commitments = getAllCommitments();
+  const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
   //transferBetweenTwoOtherAccounts(escrow, amount); // Funds go from matcher to contractName (a.k.a. "self" or "escrow"). // Probably this line is unnecessary. If funds are sent here via attachedDeposit, are there any other required steps for them to be considered secured in this contract as escrow?
   // TODO: Probably the rest of this function should be moved to a callback.
   let total = amount;
-  if (commitments.contains(recipient)) {
-    const matchersForThisRecipient = commitments.getSome(recipient);
-    if (matchersForThisRecipient.contains(matcher)) {
-      const existingCommitment = matchersForThisRecipient.getSome(matcher);
-      total = u128.add(existingCommitment, amount);
-    }
-    matchersForThisRecipient.set(matcher, total);
-  } else {
-    const matcherAccountIdCommitmentAmountMap = new PersistentUnorderedMap<AccountId, u128>(`matcherAccountIdCommitmentAmountMap_${matcher}`);
-    matcherAccountIdCommitmentAmountMap.set(matcher, amount);
-    commitments.set(recipient, matcherAccountIdCommitmentAmountMap);
+  if (matchersForThisRecipient.contains(matcher)) {
+    const existingCommitment = matchersForThisRecipient.getSome(matcher);
+    total = u128.add(existingCommitment, amount);
   }
+  matchersForThisRecipient.set(matcher, total);
   const result = `${matcher} is now committed to match donations to ${recipient} up to a maximum of ${total}.`;
   logging.log(result);
   return result;
@@ -52,17 +31,14 @@ export function offerMatchingFunds(recipient: AccountId): string {
 
 export function getCommitments(recipient: AccountId): string {
   const matchersLog: string[] = [];
-  const commitments = getAllCommitments();
-  if (commitments.contains(recipient)) {
-    const matchersForThisRecipient = commitments.getSome(recipient);
-    const matchers = matchersForThisRecipient.keys();
-    for (let i = 0; i < matchers.length; i += 1) {
-      const matcher = matchers[i];
-      const existingCommitment: u128 = matchersForThisRecipient.getSome(matcher);
-      const msg = `${matcher} is committed to match donations to ${recipient} up to a maximum of ${existingCommitment.toString()}.`;
-      logging.log(msg);
-      matchersLog.push(msg);
-    }
+  const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
+  const matchers = matchersForThisRecipient.keys();
+  for (let i = 0; i < matchers.length; i += 1) {
+    const matcher = matchers[i];
+    const existingCommitment: u128 = matchersForThisRecipient.getSome(matcher);
+    const msg = `${matcher} is committed to match donations to ${recipient} up to a maximum of ${existingCommitment.toString()}.`;
+    logging.log(msg);
+    matchersLog.push(msg);
   }
   return matchersLog.join(' ');
 }
@@ -71,21 +47,27 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
   // Is `string` the correct type for `requestedAmount`?
   const matcher = Context.sender;
   const requestedWithdrawalAmount = u128.fromString(requestedAmount); // or maybe https://docs.near.org/docs/tutorials/create-transactions#formatting-token-amounts
-  const commitments = getAllCommitments();
-  const matchersForThisRecipient = commitments.getSome(recipient); // Fails if recipient does not exist.
-  const amountAlreadyCommitted = matchersForThisRecipient.getSome(matcher); // Fails if matcher does not exist for this recipient.
-  let amountToRescind = requestedWithdrawalAmount;
+  const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
   let result: string;
-  if (requestedWithdrawalAmount >= amountAlreadyCommitted) {
-    amountToRescind = amountAlreadyCommitted;
-    matchersForThisRecipient.delete(matcher);
-    result = `${matcher} is not matching donations to ${recipient} anymore`;
+  if (matchersForThisRecipient.contains(matcher)) {
+    const amountAlreadyCommitted = matchersForThisRecipient.getSome(matcher); // Fails if matcher does not exist for this recipient.
+    let amountToRescind = requestedWithdrawalAmount;
+    if (requestedWithdrawalAmount >= amountAlreadyCommitted) {
+      amountToRescind = amountAlreadyCommitted;
+      matchersForThisRecipient.delete(matcher);
+      result = `${matcher} is not matching donations to ${recipient} anymore`;
+    } else {
+      const newAmount = u128.sub(amountAlreadyCommitted, amountToRescind);
+      matchersForThisRecipient.set(matcher, newAmount);
+      result = `${matcher} rescinded ${amountToRescind} and so is now only committed to match donations to ${recipient} up to a maximum of ${newAmount}.`;
+    }
+    transferFromEscrow(matcher, requestedWithdrawalAmount); // Funds go from escrow back to the matcher. // TODO: How could this contract have required pre-payment (during the original pledging of funds) of the fees that would be required for any refund transfer?
+    // TODO: Should there be a callback?
   } else {
-    matchersForThisRecipient.set(matcher, u128.sub(amountAlreadyCommitted, amountToRescind));
-    result = `${matcher} rescinded ${amountToRescind} and so is now only committed to match donations to ${recipient} up to a maximum of ${amountAlreadyCommitted}.`;
+    // Fails if recipient does not exist.
+    result = `${matcher} does not currently have any funds committed to ${recipient}, so funds cannot be rescinded.`;
   }
-  transferFromEscrow(matcher, requestedWithdrawalAmount); // Funds go from escrow back to the matcher. // TODO: How could this contract have required pre-payment (during the original pledging of funds) of the fees that would be required for any refund transfer?
-  // TODO: Should there be a callback?
+
   logging.log(result);
   return result;
 }
@@ -116,8 +98,7 @@ function sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: 
 }
 
 function sendMatchingDonations(recipient: AccountId, amount: u128): string[] {
-  const commitments = getAllCommitments();
-  const matchersForThisRecipient = commitments.getSome(recipient);
+  const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
   const messages: string[] = [];
   const matcherKeysForThisRecipient = matchersForThisRecipient.keys();
   for (let i = 0; i < matcherKeysForThisRecipient.length; i += 1) {
