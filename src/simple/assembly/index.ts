@@ -21,12 +21,15 @@ type MatcherAccountIdCommitmentAmountMap = PersistentUnorderedMap<AccountId, u12
       },
     }
  */
-const commitments = new PersistentUnorderedMap<AccountId, MatcherAccountIdCommitmentAmountMap>('allCommitments'); // See comment above about PersistentSet​.
+function getAllCommitments() {
+  return new PersistentUnorderedMap<AccountId, MatcherAccountIdCommitmentAmountMap>('allCommitments'); // See comment above about PersistentSet​.
+}
 
 export function offerMatchingFunds(recipient: AccountId): string {
   const matcher = Context.sender;
   const amount = Context.attachedDeposit;
   assert(u128.gt(amount, u128.Zero), '`attachedDeposit` must be > 0.');
+  const commitments = getAllCommitments();
   //transferBetweenTwoOtherAccounts(escrow, amount); // Funds go from matcher to contractName (a.k.a. "self" or "escrow"). // Probably this line is unnecessary. If funds are sent here via attachedDeposit, are there any other required steps for them to be considered secured in this contract as escrow?
   // TODO: Probably the rest of this function should be moved to a callback.
   let total = amount;
@@ -49,6 +52,7 @@ export function offerMatchingFunds(recipient: AccountId): string {
 
 export function getCommitments(recipient: AccountId): string {
   const matchersLog = [];
+  const commitments = getAllCommitments();
   if (commitments.contains(recipient)) {
     const matchersForThisRecipient = commitments.getSome(recipient);
     const matchers = matchersForThisRecipient.keys();
@@ -72,6 +76,7 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
   // Is `string` the correct type for `requestedAmount`?
   const matcher = Context.sender;
   const requestedWithdrawalAmount = u128.fromString(requestedAmount); // or maybe https://docs.near.org/docs/tutorials/create-transactions#formatting-token-amounts
+  const commitments = getAllCommitments();
   const matchersForThisRecipient = commitments.getSome(recipient); // Fails if recipient does not exist.
   const amountAlreadyCommitted = matchersForThisRecipient.getSome(matcher); // Fails if matcher does not exist for this recipient.
   let amountToRescind = requestedWithdrawalAmount;
@@ -116,6 +121,7 @@ function sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: 
 }
 
 function sendMatchingDonations(recipient: AccountId, amount: u128): string[] {
+  const commitments = getAllCommitments();
   const matchersForThisRecipient = commitments.getSome(recipient);
   const messages: string[] = [];
   const matcherKeysForThisRecipient = matchersForThisRecipient.keys();
