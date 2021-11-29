@@ -26,7 +26,7 @@ const commitments = new PersistentUnorderedMap<AccountId, MatcherAccountIdCommit
 export function offerMatchingFunds(recipient: AccountId): string {
   const matcher = Context.sender;
   const amount = Context.attachedDeposit;
-  assert(u128.gt(amount, u128.Zero), '`attachedDeposit` must be > 0');
+  assert(u128.gt(amount, u128.Zero), '`attachedDeposit` must be > 0.');
   //transferBetweenTwoOtherAccounts(escrow, amount); // Funds go from matcher to contractName (a.k.a. "self" or "escrow"). // Probably this line is unnecessary. If funds are sent here via attachedDeposit, are there any other required steps for them to be considered secured in this contract as escrow?
   // TODO: Probably the rest of this function should be moved to a callback.
   let total = amount;
@@ -42,9 +42,24 @@ export function offerMatchingFunds(recipient: AccountId): string {
     matcherAccountIdCommitmentAmountMap.set(matcher, amount);
     commitments.set(recipient, matcherAccountIdCommitmentAmountMap);
   }
-  const result = `${matcher} is now committed to match donations to ${recipient} up to a maximum of ${total}`;
+  const result = `${matcher} is now committed to match donations to ${recipient} up to a maximum of ${total}.`;
   logging.log(result);
   return result;
+}
+
+export function getCommitments(recipient: AccountId): MatcherAccountIdCommitmentAmountMap | null {
+  if (commitments.contains(recipient)) {
+    const matchersForThisRecipient = commitments.getSome(recipient);
+    const matchers = matchersForThisRecipient.keys();
+    for (let i = 0; i < matchers.length; i += 1) {
+      const matcher = matchers[i];
+      const existingCommitment = matchersForThisRecipient.getSome(matcher);
+      logging.log(`${matcher} is committed to match donations to ${recipient} up to a maximum of ${existingCommitment}.`);
+    }
+    return matchersForThisRecipient;
+  } else {
+    return null;
+  }
 }
 
 function min(a: u128, b: u128): u128 {
@@ -55,7 +70,7 @@ function min(a: u128, b: u128): u128 {
 export function rescindMatchingFunds(recipient: AccountId, requestedAmount: string): string {
   // Is `string` the correct type for `requestedAmount`?
   const matcher = Context.sender;
-  const requestedWithdrawalAmount = u128.fromString(requestedAmount);
+  const requestedWithdrawalAmount = u128.fromString(requestedAmount); // or maybe https://docs.near.org/docs/tutorials/create-transactions#formatting-token-amounts
   const matchersForThisRecipient = commitments.getSome(recipient); // Fails if recipient does not exist.
   const amountAlreadyCommitted = matchersForThisRecipient.getSome(matcher); // Fails if matcher does not exist for this recipient.
   let amountToRescind = requestedWithdrawalAmount;
@@ -66,7 +81,7 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
     result = `${matcher} is not matching donations to ${recipient} anymore`;
   } else {
     matchersForThisRecipient.set(matcher, u128.sub(amountAlreadyCommitted, amountToRescind));
-    result = `${matcher} rescinded ${amountToRescind} and so is now only committed to match donations to ${recipient} up to a maximum of ${amountAlreadyCommitted}`;
+    result = `${matcher} rescinded ${amountToRescind} and so is now only committed to match donations to ${recipient} up to a maximum of ${amountAlreadyCommitted}.`;
   }
   transferFromEscrow(matcher, requestedWithdrawalAmount); // Funds go from escrow back to the matcher. // TODO: How could this contract have required pre-payment (during the original pledging of funds) of the fees that would be required for any refund transfer?
   // TODO: Should there be a callback?
@@ -78,7 +93,7 @@ function onTransferComplete(): void {
   assert_self();
   assert_single_promise_success();
 
-  logging.log('transfer complete');
+  logging.log('Transfer complete.');
   //TODO: Figure out what this function should do, like https://github.com/Learn-NEAR/NCD.L1.sample--thanks/blob/bfe073b572cce35f0a9748a7d4851c2cfa5f09b9/src/thanks/assembly/index.ts#L76
 }
 
@@ -90,12 +105,12 @@ function transferFromEscrow(destinationAccount: AccountId, amount: u128): Contra
 function sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: u128, matchersForThisRecipient: MatcherAccountIdCommitmentAmountMap): string {
   const remainingCommitment: u128 = matchersForThisRecipient.getSome(matcher);
   const matchedAmount: u128 = min(amount, remainingCommitment);
-  logging.log(`${matcher} will send a matching donation of ${matchedAmount} to ${recipient}`);
+  logging.log(`${matcher} will send a matching donation of ${matchedAmount} to ${recipient}.`);
   // const transferPromise = transferFromEscrow(recipient, matchedAmount);
   transferFromEscrow(recipient, matchedAmount);
   // https://github.com/Learn-NEAR/NCD.L1.sample--thanks/blob/bfe073b572cce35f0a9748a7d4851c2cfa5f09b9/src/thanks/assembly/index.ts#L56
   // transferPromise.then(escrow).function_call('onTransferComplete', '{}', u128.Zero, XCC_GAS); // TODO: Learn what this means and whether it is correct.
-  const result = `${matcher} sent a matching donation of ${matchedAmount} to ${recipient}`;
+  const result = `${matcher} sent a matching donation of ${matchedAmount} to ${recipient}.`;
   return result;
 }
 
@@ -113,11 +128,11 @@ function sendMatchingDonations(recipient: AccountId, amount: u128): string[] {
 
 export function donate(recipient: AccountId): string {
   const amount = Context.attachedDeposit;
-  assert(amount > u128.Zero, '`attachedDeposit` must be > 0');
+  assert(amount > u128.Zero, '`attachedDeposit` must be > 0.');
   const sender = Context.sender;
   transferFromEscrow(recipient, amount); // Immediately pass it along.
   // TODO: Assert that the transfer succeeded.
-  const mainDonationMessage = `${sender} donated ${amount} to ${recipient}`;
+  const mainDonationMessage = `${sender} donated ${amount} to ${recipient}.`;
   const matchingDonationMessages = sendMatchingDonations(recipient, amount);
   const result = `${mainDonationMessage} ${matchingDonationMessages.join(' ')}`;
   logging.log(result);
