@@ -47,19 +47,20 @@ export function offerMatchingFunds(recipient: AccountId): string {
   return result;
 }
 
-export function getCommitments(recipient: AccountId): MatcherAccountIdCommitmentAmountMap | null {
+export function getCommitments(recipient: AccountId): string {
+  const matchersLog = [];
   if (commitments.contains(recipient)) {
     const matchersForThisRecipient = commitments.getSome(recipient);
     const matchers = matchersForThisRecipient.keys();
     for (let i = 0; i < matchers.length; i += 1) {
       const matcher = matchers[i];
       const existingCommitment = matchersForThisRecipient.getSome(matcher);
-      logging.log(`${matcher} is committed to match donations to ${recipient} up to a maximum of ${existingCommitment}.`);
+      const msg = `${matcher} is committed to match donations to ${recipient} up to a maximum of ${existingCommitment}.`;
+      logging.log(msg);
+      matchersLog.push(msg);
     }
-    return matchersForThisRecipient;
-  } else {
-    return null;
   }
+  return matchersLog.join(' ');
 }
 
 function min(a: u128, b: u128): u128 {
