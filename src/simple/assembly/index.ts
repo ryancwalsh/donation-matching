@@ -43,33 +43,37 @@ export function getCommitments(recipient: AccountId): string {
   return matchersLog.join(' ');
 }
 
-export function rescindMatchingFunds(recipient: AccountId, requestedAmount: string): string {
-  // Is `string` the correct type for `requestedAmount`?
+function decreaseCommitment(recipient: AccountId, requestedAmount: u128, verb: string = 'donated'): string {
   const matcher = Context.sender;
-  const requestedWithdrawalAmount = u128.fromString(requestedAmount); // or maybe https://docs.near.org/docs/tutorials/create-transactions#formatting-token-amounts
   const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
   let result: string;
   if (matchersForThisRecipient.contains(matcher)) {
     const amountAlreadyCommitted = matchersForThisRecipient.getSome(matcher); // Fails if matcher does not exist for this recipient.
-    let amountToRescind = requestedWithdrawalAmount;
-    if (requestedWithdrawalAmount >= amountAlreadyCommitted) {
-      amountToRescind = amountAlreadyCommitted;
+    let amountToDecrease = requestedAmount;
+    if (requestedAmount >= amountAlreadyCommitted) {
+      amountToDecrease = amountAlreadyCommitted;
       matchersForThisRecipient.delete(matcher);
       result = `${matcher} is not matching donations to ${recipient} anymore`;
     } else {
-      const newAmount = u128.sub(amountAlreadyCommitted, amountToRescind);
+      const newAmount = u128.sub(amountAlreadyCommitted, amountToDecrease);
       matchersForThisRecipient.set(matcher, newAmount);
-      result = `${matcher} rescinded ${amountToRescind} and so is now only committed to match donations to ${recipient} up to a maximum of ${newAmount}.`;
+      result = `${matcher} ${verb} ${amountToDecrease} and so is now only committed to match donations to ${recipient} up to a maximum of ${newAmount}.`;
     }
-    transferFromEscrow(matcher, requestedWithdrawalAmount); // Funds go from escrow back to the matcher. // TODO: How could this contract have required pre-payment (during the original pledging of funds) of the fees that would be required for any refund transfer?
+    transferFromEscrow(matcher, requestedAmount); // Funds go from escrow back to the matcher. // TODO: How could this contract have required pre-payment (during the original pledging of funds) of the fees that would be required for any refund transfer?
     // TODO: Should there be a callback?
   } else {
     // Fails if recipient does not exist.
-    result = `${matcher} does not currently have any funds committed to ${recipient}, so funds cannot be rescinded.`;
+    result = `${matcher} does not currently have any funds committed to ${recipient}, so funds cannot be ${verb}.`;
   }
 
   logging.log(result);
   return result;
+}
+
+export function rescindMatchingFunds(recipient: AccountId, requestedAmount: string): string {
+  // Is `string` the correct type for `requestedAmount`?
+  const requestedWithdrawalAmount = u128.fromString(requestedAmount); // or maybe https://docs.near.org/docs/tutorials/create-transactions#formatting-token-amounts
+  return decreaseCommitment(recipient, requestedWithdrawalAmount, 'rescinded');
 }
 
 function onTransferComplete(): void {
@@ -93,6 +97,7 @@ function sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: 
   transferFromEscrow(recipient, matchedAmount);
   // https://github.com/Learn-NEAR/NCD.L1.sample--thanks/blob/bfe073b572cce35f0a9748a7d4851c2cfa5f09b9/src/thanks/assembly/index.ts#L56
   // transferPromise.then(escrow).function_call('onTransferComplete', '{}', u128.Zero, XCC_GAS); // TODO: Learn what this means and whether it is correct.
+  decreaseCommitment(recipient, matchedAmount);
   const result = `${matcher} sent a matching donation of ${matchedAmount} to ${recipient}.`;
   return result;
 }
