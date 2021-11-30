@@ -79,7 +79,7 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
       newAmount = u128.sub(amountAlreadyCommitted, amountToDecrease);
       result = `${matcher} rescinded ${amountToDecrease} and so is now only committed to match donations to ${recipient} up to a maximum of ${newAmount}.`;
     }
-    transferFromEscrow(matcher, requestedWithdrawalAmount)
+    transferFromEscrow(matcher, amountToDecrease)
       .then(escrow)
       .function_call('setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${newAmount}"}`, u128.Zero, XCC_GAS); // Funds go from escrow back to the matcher.
   } else {
