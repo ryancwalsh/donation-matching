@@ -44,37 +44,54 @@ export function getCommitments(recipient: AccountId): string {
   return matchersLog.join(' ');
 }
 
-function decreaseCommitment(recipient: AccountId, requestedAmount: u128, verb: string = 'donated'): string {
+function transferFromEscrow(destinationAccount: AccountId, amount: u128): ContractPromiseBatch {
+  const toDestinationAccount = ContractPromiseBatch.create(destinationAccount);
+  return toDestinationAccount.transfer(amount);
+}
+
+/**
+ * gets called via `function_call`
+ */
+function setMatcherAmount(recipient: AccountId, matcher: AccountId, amount: u128): MatcherAccountIdCommitmentAmountMap {
+  const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
+  if (u128.gt(amount, u128.Zero)) {
+    matchersForThisRecipient.set(matcher, amount);
+  } else {
+    matchersForThisRecipient.delete(matcher);
+  }
+  return matchersForThisRecipient;
+}
+
+export function rescindMatchingFunds(recipient: AccountId, requestedAmount: string): string {
+  const escrow = Context.contractName;
   const matcher = Context.sender;
+  const requestedWithdrawalAmount = u128.fromString(requestedAmount); // or maybe https://docs.near.org/docs/tutorials/create-transactions#formatting-token-amounts
   const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
   let result: string;
   if (matchersForThisRecipient.contains(matcher)) {
-    const amountAlreadyCommitted = matchersForThisRecipient.getSome(matcher); // Fails if matcher does not exist for this recipient.
-    let amountToDecrease = requestedAmount;
-    if (requestedAmount >= amountAlreadyCommitted) {
+    const amountAlreadyCommitted = matchersForThisRecipient.getSome(matcher);
+    let amountToDecrease = requestedWithdrawalAmount;
+    let newAmount = u128.Zero;
+    if (u128.ge(requestedWithdrawalAmount, amountAlreadyCommitted)) {
       amountToDecrease = amountAlreadyCommitted;
-      matchersForThisRecipient.delete(matcher);
-      result = `${matcher} is not matching donations to ${recipient} anymore`;
+      result = `${matcher} rescinded ${amountToDecrease} and is not matching donations to ${recipient} anymore`;
     } else {
-      const newAmount = u128.sub(amountAlreadyCommitted, amountToDecrease);
-      matchersForThisRecipient.set(matcher, newAmount);
-      result = `${matcher} ${verb} ${amountToDecrease} and so is now only committed to match donations to ${recipient} up to a maximum of ${newAmount}.`;
+      newAmount = u128.sub(amountAlreadyCommitted, amountToDecrease);
+      result = `${matcher} rescinded ${amountToDecrease} and so is now only committed to match donations to ${recipient} up to a maximum of ${newAmount}.`;
     }
-    transferFromEscrow(matcher, requestedAmount); // Funds go from escrow back to the matcher.
+    transferFromEscrow(matcher, requestedWithdrawalAmount)
+      .then(escrow)
+      .function_call('setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${newAmount}"}`, u128.Zero, XCC_GAS); // Funds go from escrow back to the matcher.
   } else {
-    // Fails if recipient does not exist.
-    result = `${matcher} does not currently have any funds committed to ${recipient}, so funds cannot be ${verb}.`;
+    result = `${matcher} does not currently have any funds committed to ${recipient}, so funds cannot be rescinded.`;
   }
-
   logging.log(result);
   return result;
 }
 
-export function rescindMatchingFunds(recipient: AccountId, requestedAmount: string): string {
-  const requestedWithdrawalAmount = u128.fromString(requestedAmount); // or maybe https://docs.near.org/docs/tutorials/create-transactions#formatting-token-amounts
-  return decreaseCommitment(recipient, requestedWithdrawalAmount, 'rescinded');
-}
-
+/**
+ * gets called via `function_call`
+ */
 function transferFromEscrowCallbackDuringDonation(donor: AccountId, recipient: AccountId, amount: u128): void {
   assert_self();
   assert_single_promise_success();
@@ -84,17 +101,12 @@ function transferFromEscrowCallbackDuringDonation(donor: AccountId, recipient: A
   sendMatchingDonations(recipient, amount);
 }
 
-function transferFromEscrow(destinationAccount: AccountId, amount: u128): ContractPromiseBatch {
-  const toDestinationAccount = ContractPromiseBatch.create(destinationAccount);
-  return toDestinationAccount.transfer(amount);
-}
-
 function sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: u128, matchersForThisRecipient: MatcherAccountIdCommitmentAmountMap): string {
   const remainingCommitment: u128 = matchersForThisRecipient.getSome(matcher);
   const matchedAmount: u128 = min(amount, remainingCommitment);
   logging.log(`${matcher} will send a matching donation of ${matchedAmount} to ${recipient}.`);
   transferFromEscrow(recipient, matchedAmount);
-  decreaseCommitment(recipient, matchedAmount);
+  // TODO decreaseCommitment(recipient, matchedAmount);
   const result = `${matcher} sent a matching donation of ${matchedAmount} to ${recipient}.`;
   return result;
 }
@@ -113,7 +125,7 @@ function sendMatchingDonations(recipient: AccountId, amount: u128): string[] {
 
 export function donate(recipient: AccountId): void {
   const amount = Context.attachedDeposit;
-  assert(amount > u128.Zero, '`attachedDeposit` must be > 0.');
+  assert(u128.gt(amount, u128.Zero), '`attachedDeposit` must be > 0.');
   const donor = Context.sender;
   const escrow = Context.contractName;
   transferFromEscrow(recipient, amount) // Immediately pass it along.
