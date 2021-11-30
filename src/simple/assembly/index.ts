@@ -52,7 +52,7 @@ function _transferFromEscrow(destinationAccount: AccountId, amount: u128): Contr
 /**
  * Gets called via `function_call`
  */
-function _setMatcherAmount(recipient: AccountId, matcher: AccountId, amount: u128): MatcherAccountIdCommitmentAmountMap {
+function setMatcherAmount(recipient: AccountId, matcher: AccountId, amount: u128): MatcherAccountIdCommitmentAmountMap {
   assert_self();
   assert_single_promise_success();
   const matchersForThisRecipient = _getMatcherCommitmentsToRecipient(recipient);
@@ -83,7 +83,7 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
     }
     _transferFromEscrow(matcher, amountToDecrease) // Funds go from escrow back to the matcher.
       .then(escrow)
-      .function_call('_setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${newAmount}"}`, u128.Zero, XCC_GAS);
+      .function_call('setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${newAmount}"}`, u128.Zero, XCC_GAS);
   } else {
     result = `${matcher} does not currently have any funds committed to ${recipient}, so funds cannot be rescinded.`;
   }
@@ -97,7 +97,7 @@ function _sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount:
   logging.log(`${matcher} will send a matching donation of ${matchedAmount} to ${recipient}.`);
   _transferFromEscrow(recipient, matchedAmount)
     .then(escrow)
-    .function_call('_setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${matchedAmount}"}`, u128.Zero, XCC_GAS);
+    .function_call('setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${matchedAmount}"}`, u128.Zero, XCC_GAS);
 }
 
 function _sendMatchingDonations(recipient: AccountId, amount: u128, escrow: AccountId): void {
@@ -112,11 +112,11 @@ function _sendMatchingDonations(recipient: AccountId, amount: u128, escrow: Acco
 /**
  * Gets called via `function_call`
  */
-function _transferFromEscrowCallbackAfterDonating(donor: AccountId, recipient: AccountId, amount: u128, escrow: AccountId): void {
+function transferFromEscrowCallbackAfterDonating(donor: AccountId, recipient: AccountId, amount: u128, escrow: AccountId): void {
   assert_self();
   assert_single_promise_success();
 
-  logging.log(`_transferFromEscrowCallbackAfterDonating. ${donor} donated ${amount} to ${recipient}.`);
+  logging.log(`transferFromEscrowCallbackAfterDonating. ${donor} donated ${amount} to ${recipient}.`);
   _sendMatchingDonations(recipient, amount, escrow);
 }
 
@@ -127,5 +127,5 @@ export function donate(recipient: AccountId): void {
   const escrow = Context.contractName;
   _transferFromEscrow(recipient, amount) // Immediately pass it along.
     .then(escrow)
-    .function_call('_transferFromEscrowCallbackAfterDonating', `{"donor":"${donor}","recipient":"${recipient}","amount":"${amount}","escrow":"${escrow}"}`, u128.Zero, XCC_GAS);
+    .function_call('transferFromEscrowCallbackAfterDonating', `{"donor":"${donor}","recipient":"${recipient}","amount":"${amount}","escrow":"${escrow}"}`, u128.Zero, XCC_GAS);
 }
