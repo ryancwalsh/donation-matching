@@ -53,7 +53,7 @@ function _transferFromEscrow(destinationAccount: AccountId, amount: u128): Contr
 /**
  * Gets called via `function_call`
  */
-function setMatcherAmount(recipient: AccountId, matcher: AccountId, amount: u128): MatcherAccountIdCommitmentAmountMap {
+export function setMatcherAmount(recipient: AccountId, matcher: AccountId, amount: u128): MatcherAccountIdCommitmentAmountMap {
   logging.log(`setMatcherAmount(recipient: ${recipient}, matcher: ${matcher}, amount: ${amount})`);
   assert_self();
   assert_single_promise_success();
@@ -116,7 +116,7 @@ function _sendMatchingDonations(recipient: AccountId, amount: u128, escrow: Acco
 /**
  * Gets called via `function_call`
  */
-function transferFromEscrowCallbackAfterDonating(donor: AccountId, recipient: AccountId, amount: u128, escrow: AccountId): void {
+export function transferFromEscrowCallbackAfterDonating(donor: AccountId, recipient: AccountId, amount: u128, escrow: AccountId): void {
   assert_self();
   assert_single_promise_success();
 
