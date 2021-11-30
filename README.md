@@ -66,7 +66,7 @@ export DONOR=donor.justatemporarylocalaccount.node0
 
 1. `near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER --deposit 5 --gas=15000000000000`
 1. `near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER2 --deposit 1 --gas=15000000000000`
-1. `near call $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER --gas=15000000000000`
+1. `near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"`
 1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": \"2000000000000000000000000\"}" --accountId $MATCHER --gas=15000000000000`
 1. `near call $CONTRACT donate "{\"recipient\": \"$RECIPIENT\"}" --accountId $DONOR --deposit 4 --gas 15000000000000`
 1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": 9999}" --accountId $MATCHER --gas=15000000000000`
