@@ -7,7 +7,7 @@ import { AccountId, assert_self, assert_single_promise_success, min, XCC_GAS } f
 
 type MatcherAccountIdCommitmentAmountMap = PersistentUnorderedMap<AccountId, u128>; // Maybe https://docs.near.org/docs/concepts/data-storage#persistentset would be more efficient and safer and protect against DDOS attacks that Sherif mentioned.
 
-function getMatcherCommitmentsToRecipient(recipient: AccountId): MatcherAccountIdCommitmentAmountMap {
+function _getMatcherCommitmentsToRecipient(recipient: AccountId): MatcherAccountIdCommitmentAmountMap {
   return new PersistentUnorderedMap<AccountId, u128>(`commitments_to_${recipient}`); // Maybe https://docs.near.org/docs/concepts/data-storage#persistentset would be more efficient and safer and protect against DDOS attacks that Sherif mentioned.
 }
 
@@ -15,7 +15,7 @@ export function offerMatchingFunds(recipient: AccountId): string {
   const matcher = Context.sender;
   const amount = Context.attachedDeposit;
   assert(u128.gt(amount, u128.Zero), '`attachedDeposit` must be > 0.');
-  const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
+  const matchersForThisRecipient = _getMatcherCommitmentsToRecipient(recipient);
   let total = amount;
   if (matchersForThisRecipient.contains(matcher)) {
     const existingCommitment = matchersForThisRecipient.getSome(matcher);
@@ -32,7 +32,7 @@ export function offerMatchingFunds(recipient: AccountId): string {
  */
 export function getCommitments(recipient: AccountId): string {
   const matchersLog: string[] = [];
-  const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
+  const matchersForThisRecipient = _getMatcherCommitmentsToRecipient(recipient);
   const matchers = matchersForThisRecipient.keys();
   for (let i = 0; i < matchers.length; i += 1) {
     const matcher = matchers[i];
@@ -44,16 +44,18 @@ export function getCommitments(recipient: AccountId): string {
   return matchersLog.join(' ');
 }
 
-function transferFromEscrow(destinationAccount: AccountId, amount: u128): ContractPromiseBatch {
+function _transferFromEscrow(destinationAccount: AccountId, amount: u128): ContractPromiseBatch {
   const toDestinationAccount = ContractPromiseBatch.create(destinationAccount);
   return toDestinationAccount.transfer(amount);
 }
 
 /**
- * gets called via `function_call`
+ * Gets called via `function_call`
  */
-function setMatcherAmount(recipient: AccountId, matcher: AccountId, amount: u128): MatcherAccountIdCommitmentAmountMap {
-  const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
+function _setMatcherAmount(recipient: AccountId, matcher: AccountId, amount: u128): MatcherAccountIdCommitmentAmountMap {
+  assert_self();
+  assert_single_promise_success();
+  const matchersForThisRecipient = _getMatcherCommitmentsToRecipient(recipient);
   if (u128.gt(amount, u128.Zero)) {
     matchersForThisRecipient.set(matcher, amount);
   } else {
@@ -66,7 +68,7 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
   const escrow = Context.contractName;
   const matcher = Context.sender;
   const requestedWithdrawalAmount = u128.fromString(requestedAmount); // or maybe https://docs.near.org/docs/tutorials/create-transactions#formatting-token-amounts
-  const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
+  const matchersForThisRecipient = _getMatcherCommitmentsToRecipient(recipient);
   let result: string;
   if (matchersForThisRecipient.contains(matcher)) {
     const amountAlreadyCommitted = matchersForThisRecipient.getSome(matcher);
@@ -79,9 +81,9 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
       newAmount = u128.sub(amountAlreadyCommitted, amountToDecrease);
       result = `${matcher} rescinded ${amountToDecrease} and so is now only committed to match donations to ${recipient} up to a maximum of ${newAmount}.`;
     }
-    transferFromEscrow(matcher, amountToDecrease)
+    _transferFromEscrow(matcher, amountToDecrease) // Funds go from escrow back to the matcher.
       .then(escrow)
-      .function_call('setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${newAmount}"}`, u128.Zero, XCC_GAS); // Funds go from escrow back to the matcher.
+      .function_call('_setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${newAmount}"}`, u128.Zero, XCC_GAS);
   } else {
     result = `${matcher} does not currently have any funds committed to ${recipient}, so funds cannot be rescinded.`;
   }
@@ -89,38 +91,33 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
   return result;
 }
 
-/**
- * gets called via `function_call`
- */
-function transferFromEscrowCallbackDuringDonation(donor: AccountId, recipient: AccountId, amount: u128): void {
-  assert_self();
-  assert_single_promise_success();
-
-  logging.log(`transferFromEscrowCallbackDuringDonation. ${donor} donated ${amount} to ${recipient}.`);
-  //TODO: Figure out what this function should do, like https://github.com/Learn-NEAR/NCD.L1.sample--thanks/blob/bfe073b572cce35f0a9748a7d4851c2cfa5f09b9/src/thanks/assembly/index.ts#L76
-  sendMatchingDonations(recipient, amount);
-}
-
-function sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: u128, matchersForThisRecipient: MatcherAccountIdCommitmentAmountMap): string {
+function _sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: u128, matchersForThisRecipient: MatcherAccountIdCommitmentAmountMap, escrow: AccountId): void {
   const remainingCommitment: u128 = matchersForThisRecipient.getSome(matcher);
   const matchedAmount: u128 = min(amount, remainingCommitment);
   logging.log(`${matcher} will send a matching donation of ${matchedAmount} to ${recipient}.`);
-  transferFromEscrow(recipient, matchedAmount);
-  // TODO decreaseCommitment(recipient, matchedAmount);
-  const result = `${matcher} sent a matching donation of ${matchedAmount} to ${recipient}.`;
-  return result;
+  _transferFromEscrow(recipient, matchedAmount)
+    .then(escrow)
+    .function_call('_setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${matchedAmount}"}`, u128.Zero, XCC_GAS);
 }
 
-function sendMatchingDonations(recipient: AccountId, amount: u128): string[] {
-  const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
-  const messages: string[] = [];
+function _sendMatchingDonations(recipient: AccountId, amount: u128, escrow: AccountId): void {
+  const matchersForThisRecipient = _getMatcherCommitmentsToRecipient(recipient);
   const matcherKeysForThisRecipient = matchersForThisRecipient.keys();
   for (let i = 0; i < matcherKeysForThisRecipient.length; i += 1) {
     const matcher = matcherKeysForThisRecipient[i];
-    const message = sendMatchingDonation(matcher, recipient, amount, matchersForThisRecipient);
-    messages.push(message);
+    _sendMatchingDonation(matcher, recipient, amount, matchersForThisRecipient, escrow);
   }
-  return messages;
+}
+
+/**
+ * Gets called via `function_call`
+ */
+function _transferFromEscrowCallbackAfterDonating(donor: AccountId, recipient: AccountId, amount: u128, escrow: AccountId): void {
+  assert_self();
+  assert_single_promise_success();
+
+  logging.log(`_transferFromEscrowCallbackAfterDonating. ${donor} donated ${amount} to ${recipient}.`);
+  _sendMatchingDonations(recipient, amount, escrow);
 }
 
 export function donate(recipient: AccountId): void {
@@ -128,7 +125,7 @@ export function donate(recipient: AccountId): void {
   assert(u128.gt(amount, u128.Zero), '`attachedDeposit` must be > 0.');
   const donor = Context.sender;
   const escrow = Context.contractName;
-  transferFromEscrow(recipient, amount) // Immediately pass it along.
+  _transferFromEscrow(recipient, amount) // Immediately pass it along.
     .then(escrow)
-    .function_call('transferFromEscrowCallbackDuringDonation', `{"donor":"${donor}","recipient":"${recipient}","amount":"${amount}"}`, u128.Zero, XCC_GAS);
+    .function_call('_transferFromEscrowCallbackAfterDonating', `{"donor":"${donor}","recipient":"${recipient}","amount":"${amount}","escrow":"${escrow}"}`, u128.Zero, XCC_GAS);
 }
