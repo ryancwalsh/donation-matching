@@ -16,8 +16,6 @@ export function offerMatchingFunds(recipient: AccountId): string {
   const amount = Context.attachedDeposit;
   assert(u128.gt(amount, u128.Zero), '`attachedDeposit` must be > 0.');
   const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
-  //transferBetweenTwoOtherAccounts(escrow, amount); // Funds go from matcher to contractName (a.k.a. "self" or "escrow"). // Probably this line is unnecessary. If funds are sent here via attachedDeposit, are there any other required steps for them to be considered secured in this contract as escrow?
-  // TODO: Probably the rest of this function should be moved to a callback.
   let total = amount;
   if (matchersForThisRecipient.contains(matcher)) {
     const existingCommitment = matchersForThisRecipient.getSome(matcher);
@@ -29,6 +27,9 @@ export function offerMatchingFunds(recipient: AccountId): string {
   return result;
 }
 
+/**
+ * view
+ */
 export function getCommitments(recipient: AccountId): string {
   const matchersLog: string[] = [];
   const matchersForThisRecipient = getMatcherCommitmentsToRecipient(recipient);
@@ -59,8 +60,7 @@ function decreaseCommitment(recipient: AccountId, requestedAmount: u128, verb: s
       matchersForThisRecipient.set(matcher, newAmount);
       result = `${matcher} ${verb} ${amountToDecrease} and so is now only committed to match donations to ${recipient} up to a maximum of ${newAmount}.`;
     }
-    transferFromEscrow(matcher, requestedAmount); // Funds go from escrow back to the matcher. // TODO: How could this contract have required pre-payment (during the original pledging of funds) of the fees that would be required for any refund transfer?
-    // TODO: Should there be a callback?
+    transferFromEscrow(matcher, requestedAmount); // Funds go from escrow back to the matcher.
   } else {
     // Fails if recipient does not exist.
     result = `${matcher} does not currently have any funds committed to ${recipient}, so funds cannot be ${verb}.`;
@@ -71,7 +71,6 @@ function decreaseCommitment(recipient: AccountId, requestedAmount: u128, verb: s
 }
 
 export function rescindMatchingFunds(recipient: AccountId, requestedAmount: string): string {
-  // Is `string` the correct type for `requestedAmount`?
   const requestedWithdrawalAmount = u128.fromString(requestedAmount); // or maybe https://docs.near.org/docs/tutorials/create-transactions#formatting-token-amounts
   return decreaseCommitment(recipient, requestedWithdrawalAmount, 'rescinded');
 }
@@ -94,10 +93,7 @@ function sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: 
   const remainingCommitment: u128 = matchersForThisRecipient.getSome(matcher);
   const matchedAmount: u128 = min(amount, remainingCommitment);
   logging.log(`${matcher} will send a matching donation of ${matchedAmount} to ${recipient}.`);
-  // const transferPromise = transferFromEscrow(recipient, matchedAmount);
   transferFromEscrow(recipient, matchedAmount);
-  // https://github.com/Learn-NEAR/NCD.L1.sample--thanks/blob/bfe073b572cce35f0a9748a7d4851c2cfa5f09b9/src/thanks/assembly/index.ts#L56
-  // transferPromise.then(escrow).function_call('onTransferComplete', '{}', u128.Zero, XCC_GAS); // TODO: Learn what this means and whether it is correct.
   decreaseCommitment(recipient, matchedAmount);
   const result = `${matcher} sent a matching donation of ${matchedAmount} to ${recipient}.`;
   return result;
@@ -109,7 +105,7 @@ function sendMatchingDonations(recipient: AccountId, amount: u128): string[] {
   const matcherKeysForThisRecipient = matchersForThisRecipient.keys();
   for (let i = 0; i < matcherKeysForThisRecipient.length; i += 1) {
     const matcher = matcherKeysForThisRecipient[i];
-    const message = sendMatchingDonation(matcher, recipient, amount, matchersForThisRecipient); // TODO: Probably this call will need to be changed to be async, which means the `message` will need to be retrieved differently.
+    const message = sendMatchingDonation(matcher, recipient, amount, matchersForThisRecipient);
     messages.push(message);
   }
   return messages;
