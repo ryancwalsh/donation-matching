@@ -53,6 +53,7 @@ function _transferFromEscrow(destinationAccount: AccountId, amount: u128): Contr
  * Gets called via `function_call`
  */
 function setMatcherAmount(recipient: AccountId, matcher: AccountId, amount: u128): MatcherAccountIdCommitmentAmountMap {
+  logging.log(`setMatcherAmount(recipient: ${recipient}, matcher: ${matcher}, amount: ${amount})`);
   assert_self();
   assert_single_promise_success();
   const matchersForThisRecipient = _getMatcherCommitmentsToRecipient(recipient);
@@ -77,17 +78,19 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
     if (u128.ge(requestedWithdrawalAmount, amountAlreadyCommitted)) {
       amountToDecrease = amountAlreadyCommitted;
       result = `${matcher} rescinded ${amountToDecrease} and is not matching donations to ${recipient} anymore`;
+      logging.log(result);
     } else {
       newAmount = u128.sub(amountAlreadyCommitted, amountToDecrease);
       result = `${matcher} rescinded ${amountToDecrease} and so is now only committed to match donations to ${recipient} up to a maximum of ${newAmount}.`;
+      logging.log(result);
     }
     _transferFromEscrow(matcher, amountToDecrease) // Funds go from escrow back to the matcher.
       .then(escrow)
       .function_call('setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${newAmount}"}`, u128.Zero, XCC_GAS);
   } else {
     result = `${matcher} does not currently have any funds committed to ${recipient}, so funds cannot be rescinded.`;
+    logging.log(result);
   }
-  logging.log(result);
   return result;
 }
 
