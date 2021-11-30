@@ -45,6 +45,7 @@ export function getCommitments(recipient: AccountId): string {
 }
 
 function _transferFromEscrow(destinationAccount: AccountId, amount: u128): ContractPromiseBatch {
+  logging.log(`_transferFromEscrow(destinationAccount: ${destinationAccount}, amount: ${amount})`);
   const toDestinationAccount = ContractPromiseBatch.create(destinationAccount);
   return toDestinationAccount.transfer(amount);
 }
@@ -77,11 +78,11 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
     let newAmount = u128.Zero;
     if (u128.ge(requestedWithdrawalAmount, amountAlreadyCommitted)) {
       amountToDecrease = amountAlreadyCommitted;
-      result = `${matcher} rescinded ${amountToDecrease} and is not matching donations to ${recipient} anymore`;
+      result = `${matcher} is about to rescind ${amountToDecrease} and then will not be matching donations to ${recipient} anymore`;
       logging.log(result);
     } else {
       newAmount = u128.sub(amountAlreadyCommitted, amountToDecrease);
-      result = `${matcher} rescinded ${amountToDecrease} and so is now only committed to match donations to ${recipient} up to a maximum of ${newAmount}.`;
+      result = `${matcher} is about to rescind ${amountToDecrease} and then will only be committed to match donations to ${recipient} up to a maximum of ${newAmount}.`;
       logging.log(result);
     }
     _transferFromEscrow(matcher, amountToDecrease) // Funds go from escrow back to the matcher.
