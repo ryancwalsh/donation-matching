@@ -76,12 +76,13 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
   return decreaseCommitment(recipient, requestedWithdrawalAmount, 'rescinded');
 }
 
-function onTransferComplete(): void {
+function transferFromEscrowCallbackDuringDonation(donor: AccountId, recipient: AccountId, amount: u128): void {
   assert_self();
   assert_single_promise_success();
 
-  logging.log('Transfer complete.');
+  logging.log(`transferFromEscrowCallbackDuringDonation. ${donor} donated ${amount} to ${recipient}.`);
   //TODO: Figure out what this function should do, like https://github.com/Learn-NEAR/NCD.L1.sample--thanks/blob/bfe073b572cce35f0a9748a7d4851c2cfa5f09b9/src/thanks/assembly/index.ts#L76
+  sendMatchingDonations(recipient, amount);
 }
 
 function transferFromEscrow(destinationAccount: AccountId, amount: u128): ContractPromiseBatch {
@@ -114,15 +115,12 @@ function sendMatchingDonations(recipient: AccountId, amount: u128): string[] {
   return messages;
 }
 
-export function donate(recipient: AccountId): string {
+export function donate(recipient: AccountId): void {
   const amount = Context.attachedDeposit;
   assert(amount > u128.Zero, '`attachedDeposit` must be > 0.');
-  const sender = Context.sender;
-  transferFromEscrow(recipient, amount); // Immediately pass it along.
-  // TODO: Assert that the transfer succeeded.
-  const mainDonationMessage = `${sender} donated ${amount} to ${recipient}.`;
-  const matchingDonationMessages = sendMatchingDonations(recipient, amount);
-  const result = `${mainDonationMessage} ${matchingDonationMessages.join(' ')}`;
-  logging.log(result);
-  return result;
+  const donor = Context.sender;
+  const escrow = Context.contractName;
+  transferFromEscrow(recipient, amount) // Immediately pass it along.
+    .then(escrow)
+    .function_call('transferFromEscrowCallbackDuringDonation', `{"donor":"${donor}","recipient":"${recipient}","amount":"${amount}"}`, u128.Zero, XCC_GAS);
 }
