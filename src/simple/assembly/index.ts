@@ -7,6 +7,21 @@ import { AccountId, assert_self, assert_single_promise_success, min, XCC_GAS } f
 
 type MatcherAccountIdCommitmentAmountMap = PersistentUnorderedMap<AccountId, u128>; // Maybe https://docs.near.org/docs/concepts/data-storage#persistentset would be more efficient and safer and protect against DDOS attacks that Sherif mentioned.
 
+@nearBindgen
+class RecipientMatcherAmount {
+  recipient: AccountId;
+  matcher: AccountId;
+  amount: u128;
+}
+
+@nearBindgen
+class DRAE {
+  donor: AccountId;
+  recipient: AccountId;
+  amount: u128;
+  escrowContractName: AccountId;
+}
+
 function _getMatcherCommitmentsToRecipient(recipient: AccountId): MatcherAccountIdCommitmentAmountMap {
   return new PersistentUnorderedMap<AccountId, u128>(`commitments_to_${recipient}`); // Maybe https://docs.near.org/docs/concepts/data-storage#persistentset would be more efficient and safer and protect against DDOS attacks that Sherif mentioned.
 }
@@ -87,7 +102,7 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
     }
     _transferFromEscrow(matcher, amountToDecrease) // Funds go from escrow back to the matcher.
       .then(escrowContractName)
-      .function_call('setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${newAmount}"}`, u128.Zero, XCC_GAS);
+      .function_call<RecipientMatcherAmount>('setMatcherAmount', { recipient, matcher, amount: newAmount }, u128.Zero, XCC_GAS);
   } else {
     result = `${matcher} does not currently have any funds committed to ${recipient}, so funds cannot be rescinded.`;
     logging.log(result);
@@ -107,7 +122,7 @@ function _sendMatchingDonation(
   logging.log(`${matcher} will send a matching donation of ${matchedAmount} to ${recipient}.`);
   _transferFromEscrow(recipient, matchedAmount)
     .then(escrowContractName)
-    .function_call('setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${matchedAmount}"}`, u128.Zero, XCC_GAS);
+    .function_call<RecipientMatcherAmount>('setMatcherAmount', { recipient, matcher, amount: matchedAmount }, u128.Zero, XCC_GAS);
 }
 
 function _sendMatchingDonations(recipient: AccountId, amount: u128, escrowContractName: AccountId): void {
@@ -137,10 +152,5 @@ export function donate(recipient: AccountId): void {
   const escrowContractName = Context.contractName;
   _transferFromEscrow(recipient, amount) // Immediately pass it along.
     .then(escrowContractName)
-    .function_call(
-      'transferFromEscrowCallbackAfterDonating',
-      `{"donor":"${donor}","recipient":"${recipient}","amount":"${amount}","escrowContractName":"${escrowContractName}"}`,
-      u128.Zero,
-      XCC_GAS,
-    );
+    .function_call<DRAE>('transferFromEscrowCallbackAfterDonating', { donor, recipient, amount, escrowContractName }, u128.Zero, XCC_GAS);
 }
