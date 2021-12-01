@@ -67,7 +67,7 @@ export function setMatcherAmount(recipient: AccountId, matcher: AccountId, amoun
 }
 
 export function rescindMatchingFunds(recipient: AccountId, requestedAmount: string): string {
-  const escrow = Context.contractName;
+  const escrowContractName = Context.contractName;
   const matcher = Context.sender;
   const requestedWithdrawalAmount = u128.fromString(requestedAmount); // or maybe https://docs.near.org/docs/tutorials/create-transactions#formatting-token-amounts
   const matchersForThisRecipient = _getMatcherCommitmentsToRecipient(recipient);
@@ -86,7 +86,7 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
       logging.log(result);
     }
     _transferFromEscrow(matcher, amountToDecrease) // Funds go from escrow back to the matcher.
-      .then(escrow)
+      .then(escrowContractName)
       .function_call('setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${newAmount}"}`, u128.Zero, XCC_GAS);
   } else {
     result = `${matcher} does not currently have any funds committed to ${recipient}, so funds cannot be rescinded.`;
@@ -95,41 +95,52 @@ export function rescindMatchingFunds(recipient: AccountId, requestedAmount: stri
   return result;
 }
 
-function _sendMatchingDonation(matcher: AccountId, recipient: AccountId, amount: u128, matchersForThisRecipient: MatcherAccountIdCommitmentAmountMap, escrow: AccountId): void {
+function _sendMatchingDonation(
+  matcher: AccountId,
+  recipient: AccountId,
+  amount: u128,
+  matchersForThisRecipient: MatcherAccountIdCommitmentAmountMap,
+  escrowContractName: AccountId,
+): void {
   const remainingCommitment: u128 = matchersForThisRecipient.getSome(matcher);
   const matchedAmount: u128 = min(amount, remainingCommitment);
   logging.log(`${matcher} will send a matching donation of ${matchedAmount} to ${recipient}.`);
   _transferFromEscrow(recipient, matchedAmount)
-    .then(escrow)
+    .then(escrowContractName)
     .function_call('setMatcherAmount', `{"recipient":"${recipient}","matcher":"${matcher}","amount":"${matchedAmount}"}`, u128.Zero, XCC_GAS);
 }
 
-function _sendMatchingDonations(recipient: AccountId, amount: u128, escrow: AccountId): void {
+function _sendMatchingDonations(recipient: AccountId, amount: u128, escrowContractName: AccountId): void {
   const matchersForThisRecipient = _getMatcherCommitmentsToRecipient(recipient);
   const matcherKeysForThisRecipient = matchersForThisRecipient.keys();
   for (let i = 0; i < matcherKeysForThisRecipient.length; i += 1) {
     const matcher = matcherKeysForThisRecipient[i];
-    _sendMatchingDonation(matcher, recipient, amount, matchersForThisRecipient, escrow);
+    _sendMatchingDonation(matcher, recipient, amount, matchersForThisRecipient, escrowContractName);
   }
 }
 
 /**
  * Gets called via `function_call`
  */
-export function transferFromEscrowCallbackAfterDonating(donor: AccountId, recipient: AccountId, amount: u128, escrow: AccountId): void {
+export function transferFromEscrowCallbackAfterDonating(donor: AccountId, recipient: AccountId, amount: u128, escrowContractName: AccountId): void {
   assert_self();
   assert_single_promise_success();
 
   logging.log(`transferFromEscrowCallbackAfterDonating. ${donor} donated ${amount} to ${recipient}.`);
-  _sendMatchingDonations(recipient, amount, escrow);
+  _sendMatchingDonations(recipient, amount, escrowContractName);
 }
 
 export function donate(recipient: AccountId): void {
   const amount = Context.attachedDeposit;
   assert(u128.gt(amount, u128.Zero), '`attachedDeposit` must be > 0.');
   const donor = Context.sender;
-  const escrow = Context.contractName;
+  const escrowContractName = Context.contractName;
   _transferFromEscrow(recipient, amount) // Immediately pass it along.
-    .then(escrow)
-    .function_call('transferFromEscrowCallbackAfterDonating', `{"donor":"${donor}","recipient":"${recipient}","amount":"${amount}","escrow":"${escrow}"}`, u128.Zero, XCC_GAS);
+    .then(escrowContractName)
+    .function_call(
+      'transferFromEscrowCallbackAfterDonating',
+      `{"donor":"${donor}","recipient":"${recipient}","amount":"${amount}","escrowContractName":"${escrowContractName}"}`,
+      u128.Zero,
+      XCC_GAS,
+    );
 }
