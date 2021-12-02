@@ -152,8 +152,11 @@ export function donate(recipient: AccountId): void {
   const escrowContractName = Context.contractName;
   const prepaidGas = Context.prepaidGas;
   const gasAlreadyBurned = Context.usedGas;
-  const remainingGas = prepaidGas - gasAlreadyBurned;
-  logging.log(`prepaidGas=${prepaidGas}, gasAlreadyBurned=${gasAlreadyBurned}, remainingGas=${remainingGas}`);
+  const gasToBeBurnedDuringTransferFromEscrow = XCC_GAS;
+  const remainingGas = prepaidGas - gasAlreadyBurned - gasToBeBurnedDuringTransferFromEscrow;
+  logging.log(
+    `prepaidGas=${prepaidGas}, gasAlreadyBurned=${gasAlreadyBurned}, gasToBeBurnedDuringTransferFromEscrow=${gasToBeBurnedDuringTransferFromEscrow}, remainingGas=${remainingGas}`,
+  );
   _transferFromEscrow(recipient, amount) // Immediately pass it along.
     .then(escrowContractName)
     .function_call<DRAE>('transferFromEscrowCallbackAfterDonating', { donor, recipient, amount, escrowContractName }, u128.Zero, remainingGas);
