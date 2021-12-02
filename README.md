@@ -72,13 +72,16 @@ export DONOR=donor.justatemporarylocalaccount.node0
 
 ### Now try using the contract (on localnet or testnet):
 
-1. `near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER1 --deposit 5 --gas=15000000000000`
+1. `near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER1 --deposit 9 --gas=15000000000000`
 1. `near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER2 --deposit 1 --gas=15000000000000`
-1. `near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"`
+1. `near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"` (The result should reflect the values from above, and the Explorer should now also show Matcher1's balance as ~11 and Matcher2's balance as ~19.)
 1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": \"2000000000000000000000000\"}" --accountId $MATCHER1 --gas=90000000000000`
-1. `near call $CONTRACT donate "{\"recipient\": \"$RECIPIENT\"}" --accountId $DONOR --deposit 4 --gas 300000000000000`
-1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": 9999}" --accountId $MATCHER1 --gas=90000000000000`
-1. Optionally nuke the match relationships: `near call $CONTRACT deleteAllMatchesAssociatedWithRecipient "{\"recipient\": \"$RECIPIENT\"}" --accountId $CONTRACT --gas=15000000000000`
+1. `near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"` (Matcher1 should now only have 7 committed to this Recipient. The Explorer should now also show Matcher1's balance as ~13.)
+1. `near call $CONTRACT donate "{\"recipient\": \"$RECIPIENT\"}" --accountId $DONOR --deposit 4 --gas 300000000000000` (The Explorer should now show Recipient's balance as 10+4+4+1 = 19 and Matcher1's balance as still ~13 and Matcher2's balance as still ~19 and Donor's balance is ~16.)
+1. `near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"` (Only Matcher1 should be committed to 3.)
+1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": 9999}" --accountId $MATCHER1 --gas=90000000000000` (The Explorer should now show Matcher1's balance as ~16.)
+1. `near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"` (empty)
+1. Optionally nuke the match relationships if they weren't already emptied: `near call $CONTRACT deleteAllMatchesAssociatedWithRecipient "{\"recipient\": \"$RECIPIENT\"}" --accountId $CONTRACT --gas=15000000000000`
 1. Optionally clean up accounts with:
    ```
    near delete $DONOR $PARENT
