@@ -31,9 +31,15 @@ near create-account justatemporarylocalaccount.node0 --masterAccount node0 --ini
 
 near create-account recipient.justatemporarylocalaccount.node0 --masterAccount justatemporarylocalaccount.node0 --initialBalance 10
 
+near create-account matcher1.justatemporarylocalaccount.node0 --masterAccount justatemporarylocalaccount.node0 --initialBalance 20
+
+near create-account matcher2.justatemporarylocalaccount.node0 --masterAccount justatemporarylocalaccount.node0 --initialBalance 20
+
 near create-account donor.justatemporarylocalaccount.node0 --masterAccount justatemporarylocalaccount.node0 --initialBalance 20
 
-export MATCHER=justatemporarylocalaccount.node0
+export PARENT=justatemporarylocalaccount.node0
+export MATCHER1=matcher1.justatemporarylocalaccount.node0
+export MATCHER2=matcher2.justatemporarylocalaccount.node0
 export RECIPIENT=recipient.justatemporarylocalaccount.node0
 export DONOR=donor.justatemporarylocalaccount.node0
 ```
@@ -49,14 +55,16 @@ export DONOR=donor.justatemporarylocalaccount.node0
 
    ```
    near create-account recipient.ryancwalsh.testnet --masterAccount ryancwalsh.testnet --initialBalance 10
-   near create-account matcher2.ryancwalsh.testnet --masterAccount ryancwalsh.testnet --initialBalance 10
+   near create-account matcher1.ryancwalsh.testnet --masterAccount ryancwalsh.testnet --initialBalance 20
+   near create-account matcher2.ryancwalsh.testnet --masterAccount ryancwalsh.testnet --initialBalance 20
    near create-account donor.ryancwalsh.testnet --masterAccount ryancwalsh.testnet --initialBalance 20
    ```
 
 1. Call `export` commands to define RECIPIENT, MATCHER, and DONOR with the accountIds from the previous steps. E.g.:
 
    ```
-   export MATCHER=ryancwalsh.testnet
+   export PARENT=ryancwalsh.testnet
+   export MATCHER1=matcher1.ryancwalsh.testnet
    export MATCHER2=matcher2.ryancwalsh.testnet
    export RECIPIENT=recipient.ryancwalsh.testnet
    export DONOR=donor.ryancwalsh.testnet
@@ -64,16 +72,17 @@ export DONOR=donor.justatemporarylocalaccount.node0
 
 ### Now try using the contract (on localnet or testnet):
 
-1. `near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER --deposit 5 --gas=15000000000000`
+1. `near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER1 --deposit 5 --gas=15000000000000`
 1. `near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER2 --deposit 1 --gas=15000000000000`
 1. `near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"`
-1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": \"2000000000000000000000000\"}" --accountId $MATCHER --gas=90000000000000`
+1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": \"2000000000000000000000000\"}" --accountId $MATCHER1 --gas=90000000000000`
 1. `near call $CONTRACT donate "{\"recipient\": \"$RECIPIENT\"}" --accountId $DONOR --deposit 4 --gas 300000000000000`
-1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": 9999}" --accountId $MATCHER --gas=90000000000000`
+1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": 9999}" --accountId $MATCHER1 --gas=90000000000000`
 1. Optionally nuke the match relationships: `near call $CONTRACT deleteAllMatchesAssociatedWithRecipient "{\"recipient\": \"$RECIPIENT\"}" --accountId $CONTRACT --gas=15000000000000`
 1. Optionally clean up accounts with:
    ```
-   near delete $DONOR $MATCHER
-   near delete $RECIPIENT $MATCHER
-   near delete $MATCHER2 $MATCHER
+   near delete $DONOR $PARENT
+   near delete $RECIPIENT $PARENT
+   near delete $MATCHER1 $PARENT
+   near delete $MATCHER2 $PARENT
    ```
