@@ -162,3 +162,18 @@ export function donate(recipient: AccountId): void {
     .then(escrowContractName)
     .function_call<DRAE>('transferFromEscrowCallbackAfterDonating', { donor, recipient, amount, escrowContractName }, u128.Zero, remainingGas);
 }
+
+export function deleteAllMatchesAssociatedWithRecipient(recipient: AccountId): string {
+  assert_self();
+  const matchersLog: string[] = [];
+  const matchersForThisRecipient = _getMatcherCommitmentsToRecipient(recipient);
+  const matchers = matchersForThisRecipient.keys();
+  for (let i = 0; i < matchers.length; i += 1) {
+    const matcher = matchers[i];
+    matchersForThisRecipient.delete(matcher);
+    const msg = `Deleted matcher ${matcher} from recipient ${recipient}.`;
+    logging.log(msg);
+    matchersLog.push(msg);
+  }
+  return matchersLog.join(' ');
+}
