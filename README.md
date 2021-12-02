@@ -15,13 +15,13 @@ On each donation:
 
 ---
 
-## Usage
+# Usage
 
 1. clone this repo to a local folder
 1. run `yarn`
 1. Read https://docs.near.org/docs/tools/near-cli#near-call and decide whether you want to use `--depositYocto` or `--deposit` in the steps below.
 
-### For localnet (work in progress; consider using testnet below for now):
+## For localnet (work in progress; consider using testnet below for now):
 
 1. `export NEAR_ENV=local`
 1. [how to deploy contract locally?]
@@ -44,7 +44,7 @@ export RECIPIENT=recipient.justatemporarylocalaccount.node0
 export DONOR=donor.justatemporarylocalaccount.node0
 ```
 
-### For testnet:
+## For testnet:
 
 1. `export NEAR_ENV=testnet`
 1. `./scripts/1.dev-deploy.sh`
@@ -70,22 +70,61 @@ export DONOR=donor.justatemporarylocalaccount.node0
    export DONOR=donor.ryancwalsh.testnet
    ```
 
-### Now try using the contract (on localnet or testnet):
+## Now try using the contract (on localnet or testnet):
 
-1. `near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER1 --deposit 9 --gas=15000000000000`
-1. `near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER2 --deposit 1 --gas=15000000000000`
-1. `near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"` (The result should reflect the values from above, and the Explorer should now also show Matcher1's balance as ~11 and Matcher2's balance as ~19.)
-1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": \"2000000000000000000000000\"}" --accountId $MATCHER1 --gas=90000000000000`
-1. `near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"` (Matcher1 should now only have 7 committed to this Recipient. The Explorer should now also show Matcher1's balance as ~13.)
-1. `near call $CONTRACT donate "{\"recipient\": \"$RECIPIENT\"}" --accountId $DONOR --deposit 4 --gas 300000000000000` (The Explorer should now show Recipient's balance as 10+4+4+1 = 19 and Matcher1's balance as still ~13 and Matcher2's balance as still ~19 and Donor's balance is ~16.)
-1. `near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"` (Only Matcher1 should be committed to 3.)
-1. `near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": 9999}" --accountId $MATCHER1 --gas=90000000000000` (The Explorer should now show Matcher1's balance as ~16.)
-1. `near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"` (empty)
-1. Optionally nuke the match relationships if they weren't already emptied: `near call $CONTRACT deleteAllMatchesAssociatedWithRecipient "{\"recipient\": \"$RECIPIENT\"}" --accountId $CONTRACT --gas=15000000000000`
-1. Optionally clean up accounts with:
-   ```
-   near delete $DONOR $PARENT
-   near delete $RECIPIENT $PARENT
-   near delete $MATCHER1 $PARENT
-   near delete $MATCHER2 $PARENT
-   ```
+```
+near state $MATCHER1 |  sed -n "s/.*formattedAmount: '\([^\\]*\).*'/\1/p"
+near state $MATCHER2 |  sed -n "s/.*formattedAmount: '\([^\\]*\).*'/\1/p"
+near state $RECIPIENT |  sed -n "s/.*formattedAmount: '\([^\\]*\).*'/\1/p"
+near state $DONOR |  sed -n "s/.*formattedAmount: '\([^\\]*\).*'/\1/p"
+near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER1 --deposit 9 --gas=15000000000000
+near call $CONTRACT offerMatchingFunds "{\"recipient\": \"$RECIPIENT\"}" --accountId $MATCHER2 --deposit 1 --gas=15000000000000
+near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"
+near state $MATCHER1 |  sed -n "s/.*formattedAmount: '\([^\\]*\).*'/\1/p"
+near state $MATCHER2 |  sed -n "s/.*formattedAmount: '\([^\\]*\).*'/\1/p"
+```
+
+(The result should reflect the values from above, and the CLI/Explorer should now also show Matcher1's balance as ~11 and Matcher2's balance as ~19.)
+
+```
+near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": \"2000000000000000000000000\"}" --accountId $MATCHER1 --gas=90000000000000
+near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"
+near state $MATCHER1 |  sed -n "s/.*formattedAmount: '\([^\\]*\).*'/\1/p"
+```
+
+(Matcher1 should now only have 7 committed to this Recipient. The CLI/Explorer should now also show Matcher1's balance as ~13.)
+
+```
+near call $CONTRACT donate "{\"recipient\": \"$RECIPIENT\"}" --accountId $DONOR --deposit 4 --gas 300000000000000
+near state $MATCHER1 |  sed -n "s/.*formattedAmount: '\([^\\]*\).*'/\1/p"
+near state $MATCHER2 |  sed -n "s/.*formattedAmount: '\([^\\]*\).*'/\1/p"
+near state $RECIPIENT |  sed -n "s/.*formattedAmount: '\([^\\]*\).*'/\1/p"
+near state $DONOR |  sed -n "s/.*formattedAmount: '\([^\\]*\).*'/\1/p"
+near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"
+```
+
+(Only Matcher1 should be committed to 3.)
+(The CLI/Explorer should now show:
+Recipient's balance as 10+4+4+1 = 19
+Matcher1's balance as still ~13
+Matcher2's balance as still ~19
+Donor's balance is ~16.)
+
+```
+near call $CONTRACT rescindMatchingFunds "{\"recipient\": \"$RECIPIENT\", \"requestedAmount\": \"9999000000000000000000000000\"}" --accountId $MATCHER1 --gas=90000000000000
+near state $MATCHER1 |  sed -n "s/.*formattedAmount: '\([^\\]*\).*'/\1/p"
+near view $CONTRACT getCommitments "{\"recipient\": \"$RECIPIENT\"}"
+```
+
+(The CLI/Explorer should now show Matcher1's balance as ~16 and getCommitments as empty.)
+
+Optionally nuke the match relationships if they weren't already emptied: `near call $CONTRACT deleteAllMatchesAssociatedWithRecipient "{\"recipient\": \"$RECIPIENT\"}" --accountId $CONTRACT --gas=15000000000000`
+
+Optionally clean up accounts with:
+
+```
+near delete $DONOR $PARENT
+near delete $RECIPIENT $PARENT
+near delete $MATCHER1 $PARENT
+near delete $MATCHER2 $PARENT
+```
