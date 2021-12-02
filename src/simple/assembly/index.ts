@@ -117,12 +117,13 @@ function _sendMatchingDonation(
   matchersForThisRecipient: MatcherAccountIdCommitmentAmountMap,
   escrowContractName: AccountId,
 ): void {
-  const remainingCommitment: u128 = matchersForThisRecipient.getSome(matcher);
-  const matchedAmount: u128 = min(amount, remainingCommitment);
-  logging.log(`${matcher} will send a matching donation of ${matchedAmount} to ${recipient}.`);
+  const currentCommitment: u128 = matchersForThisRecipient.getSome(matcher);
+  const matchedAmount: u128 = min(amount, currentCommitment);
+  const remainingCommitment: u128 = u128.sub(currentCommitment, matchedAmount);
+  logging.log(`${matcher} will send a matching donation of ${matchedAmount} to ${recipient}. Remaining commitment: ${remainingCommitment}.`);
   _transferFromEscrow(recipient, matchedAmount)
     .then(escrowContractName)
-    .function_call<RecipientMatcherAmount>('setMatcherAmount', { recipient, matcher, amount: matchedAmount }, u128.Zero, XCC_GAS);
+    .function_call<RecipientMatcherAmount>('setMatcherAmount', { recipient, matcher, amount: remainingCommitment }, u128.Zero, XCC_GAS);
 }
 
 function _sendMatchingDonations(recipient: AccountId, amount: u128, escrowContractName: AccountId): void {
