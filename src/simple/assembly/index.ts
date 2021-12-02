@@ -1,11 +1,13 @@
 import { PersistentUnorderedMap, Context, u128, logging, ContractPromiseBatch } from 'near-sdk-as';
-import { AccountId, assert_self, assert_single_promise_success, min, XCC_GAS } from '../../utils';
+import { AccountId, assert_self, assert_single_promise_success, Gas, min, XCC_GAS } from '../../utils';
 
 // TODO: Write tests for everything in this file. And build a frontend, too!
 
 // https://github.com/near-examples/cross-contract-calls/blob/a589ab817835f837201f4afa48be5961d8ce5360/contracts/00.orientation/README.md or maybe instead of the amount having been sent to escrow via `transfer`, I could follow this approach: https://github.com/Learn-NEAR/NCD.L1.sample--lottery/blob/2bd11bc1092004409e32b75736f78adee821f35b/src/lottery/assembly/index.ts#L149 See also https://github.com/near/NEPs/blob/07dbc5c5dc98eb5dad47c567f93a4e5479ce5aaf/specs/Standards/FungibleToken/Core.md
 
 type MatcherAccountIdCommitmentAmountMap = PersistentUnorderedMap<AccountId, u128>; // Maybe https://docs.near.org/docs/concepts/data-storage#persistentset would be more efficient and safer and protect against DDOS attacks that Sherif mentioned.
+
+const XCC_GAS_DONATE: Gas = 260_000_000_000_000; // TODO: Decrease this as much as possible. Or use remainingGas instead.
 
 @nearBindgen
 class RecipientMatcherAmount {
@@ -150,7 +152,11 @@ export function donate(recipient: AccountId): void {
   assert(u128.gt(amount, u128.Zero), '`attachedDeposit` must be > 0.');
   const donor = Context.sender;
   const escrowContractName = Context.contractName;
+  const prepaidGas = Context.prepaidGas;
+  const gasAlreadyBurned = Context.usedGas;
+  const remainingGas = prepaidGas - gasAlreadyBurned;
+  logging.log(`prepaidGas=${prepaidGas}, gasAlreadyBurned=${gasAlreadyBurned}, remainingGas=${remainingGas}`);
   _transferFromEscrow(recipient, amount) // Immediately pass it along.
     .then(escrowContractName)
-    .function_call<DRAE>('transferFromEscrowCallbackAfterDonating', { donor, recipient, amount, escrowContractName }, u128.Zero, XCC_GAS);
+    .function_call<DRAE>('transferFromEscrowCallbackAfterDonating', { donor, recipient, amount, escrowContractName }, u128.Zero, XCC_GAS_DONATE);
 }
