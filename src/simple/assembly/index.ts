@@ -7,8 +7,6 @@ import { AccountId, assert_self, assert_single_promise_success, Gas, min, XCC_GA
 
 type MatcherAccountIdCommitmentAmountMap = PersistentUnorderedMap<AccountId, u128>; // Maybe https://docs.near.org/docs/concepts/data-storage#persistentset would be more efficient and safer and protect against DDOS attacks that Sherif mentioned.
 
-const XCC_GAS_DONATE: Gas = 260_000_000_000_000; // TODO: Decrease this as much as possible. Or use remainingGas instead.
-
 @nearBindgen
 class RecipientMatcherAmount {
   recipient: AccountId;
@@ -158,5 +156,5 @@ export function donate(recipient: AccountId): void {
   logging.log(`prepaidGas=${prepaidGas}, gasAlreadyBurned=${gasAlreadyBurned}, remainingGas=${remainingGas}`);
   _transferFromEscrow(recipient, amount) // Immediately pass it along.
     .then(escrowContractName)
-    .function_call<DRAE>('transferFromEscrowCallbackAfterDonating', { donor, recipient, amount, escrowContractName }, u128.Zero, XCC_GAS_DONATE);
+    .function_call<DRAE>('transferFromEscrowCallbackAfterDonating', { donor, recipient, amount, escrowContractName }, u128.Zero, remainingGas);
 }
